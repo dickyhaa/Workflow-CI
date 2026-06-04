@@ -188,6 +188,7 @@ def main():
             input_example=input_example,
             signature=signature,
             pip_requirements=[
+                "mlflow==2.18.0",
                 "pandas",
                 "numpy",
                 "scikit-learn",

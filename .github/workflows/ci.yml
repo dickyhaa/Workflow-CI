@@ -104,7 +104,8 @@ jobs:
           IMAGE_NAME="${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}"
           mlflow models build-docker \
             -m "runs:/${{ env.RUN_ID }}/model" \
-            -n "$IMAGE_NAME:latest"
+            -n "$IMAGE_NAME:latest" \
+            --env-manager=local
 
       - name: Log in to Docker Hub
         if: github.event_name != 'pull_request'
