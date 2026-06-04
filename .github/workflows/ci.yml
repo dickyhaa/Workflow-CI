@@ -65,7 +65,22 @@ jobs:
 
       - name: Get latest MLflow run_id
         run: |
-          RUN_ID=$(cat MLProject/latest_run_id.txt)
+          echo "Checking generated files..."
+          ls -la
+          echo "Checking MLProject folder..."
+          ls -la MLProject
+
+          if [ -f latest_run_id.txt ]; then
+            RUN_ID=$(cat latest_run_id.txt)
+            echo "Found latest_run_id.txt in root directory"
+          elif [ -f MLProject/latest_run_id.txt ]; then
+            RUN_ID=$(cat MLProject/latest_run_id.txt)
+            echo "Found latest_run_id.txt in MLProject directory"
+          else
+            echo "latest_run_id.txt not found"
+            exit 1
+          fi
+
           echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
           echo "Latest MLflow Run ID: $RUN_ID"
 
@@ -75,7 +90,11 @@ jobs:
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
 
-          git add mlruns MLProject/latest_run_id.txt MLProject/artifacts
+          git add mlruns || true
+          git add latest_run_id.txt || true
+          git add MLProject/latest_run_id.txt || true
+          git add MLProject/artifacts || true
+
           git commit -m "Save MLflow artifacts from CI [skip ci]" || echo "No changes to commit"
           git push
 

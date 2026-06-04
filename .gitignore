@@ -6,6 +6,4 @@ __pycache__/
 
 mlruns/
 mlflow.db
-latest_run_id.txt
-MLProject/latest_run_id.txt
 MLProject/artifacts/
