@@ -1,0 +1,117 @@
+name: CI MLflow Project with Docker Hub
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "mlruns/**"
+      - "latest_run_id.txt"
+      - "DockerHub.txt"
+      - "MLProject/artifacts/**"
+
+  pull_request:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: "3.12.7"
+  DOCKER_IMAGE_NAME: "telco-churn-msml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Run actions/checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12.7
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Check Env
+        run: |
+          python --version
+          pip --version
+          echo "Repository: $GITHUB_REPOSITORY"
+          echo "Workspace: $GITHUB_WORKSPACE"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r MLProject/requirements.txt
+
+      - name: Set MLflow Tracking URI
+        run: |
+          echo "MLFLOW_TRACKING_URI=file:${GITHUB_WORKSPACE}/mlruns" >> $GITHUB_ENV
+
+      - name: Run mlflow project
+        run: |
+          mlflow run MLProject --env-manager=local --experiment-name "Telco Customer Churn CI"
+
+      - name: Get latest MLflow run_id
+        run: |
+          RUN_ID=$(cat MLProject/latest_run_id.txt)
+          echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
+          echo "Latest MLflow Run ID: $RUN_ID"
+
+      - name: Upload MLflow artifacts to GitHub
+        if: github.event_name != 'pull_request'
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+
+          git add mlruns MLProject/latest_run_id.txt MLProject/artifacts
+          git commit -m "Save MLflow artifacts from CI [skip ci]" || echo "No changes to commit"
+          git push
+
+      - name: Build Docker Model
+        if: github.event_name != 'pull_request'
+        run: |
+          IMAGE_NAME="${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}"
+          mlflow models build-docker \
+            -m "runs:/${{ env.RUN_ID }}/model" \
+            -n "$IMAGE_NAME:latest"
+
+      - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Tag Docker Image
+        if: github.event_name != 'pull_request'
+        run: |
+          IMAGE_NAME="${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}"
+          docker tag "$IMAGE_NAME:latest" "$IMAGE_NAME:${{ env.RUN_ID }}"
+
+      - name: Push Docker Image
+        if: github.event_name != 'pull_request'
+        run: |
+          IMAGE_NAME="${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}"
+          docker push "$IMAGE_NAME:latest"
+          docker push "$IMAGE_NAME:${{ env.RUN_ID }}"
+
+      - name: Save Docker Hub link
+        if: github.event_name != 'pull_request'
+        run: |
+          IMAGE_NAME="${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}"
+
+          echo "Docker Hub Image:" > DockerHub.txt
+          echo "$IMAGE_NAME:latest" >> DockerHub.txt
+          echo "$IMAGE_NAME:${{ env.RUN_ID }}" >> DockerHub.txt
+
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+
+          git add DockerHub.txt
+          git commit -m "Add Docker Hub image link [skip ci]" || echo "No changes to commit"
+          git push

@@ -1,0 +1,17 @@
+name: telco-churn-ci-env
+
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.12.7
+  - pip
+  - pip:
+      - mlflow==2.18.0
+      - pandas
+      - numpy
+      - scikit-learn
+      - matplotlib
+      - joblib
+      - cloudpickle
